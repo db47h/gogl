@@ -1,0 +1,6 @@
+/.vscode
+/demo/internal/gl/gl.h
+/demo/internal/gl/khrplatform.h
+/demo/internal/gl/gl.go
+/demo/internal/gl/gles2.go
+/registry
