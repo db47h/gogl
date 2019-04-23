@@ -16,6 +16,13 @@ following situations:
   custom C code more complex than it should be).
 - Most of the custom C code is written once, bundled in the generated package.
 
+There is also the `gl` package from [gomobile]. It uses Go channels and a worker
+goroutine that will batch multiple GL calls into a single cgo call. While it
+enables OpenGL calls from any goroutine, there is no explicit control of the
+batching mechanism and trading cgo calls for channel writes severely impacts
+performance: on an AMD FX6300 a cgo call incurs a 80ns overhead vs. over 400ns
+for a channel write (and 80ns vs 200ns on an i5 Skylake).
+
 ## Usage
 
 ### Installation
@@ -189,3 +196,4 @@ the generated code as mentioned above). See the [LICENSE](LICENSE) file.
 
 
 [glow]: https://github.com/go-gl/glow
+[gomobile]: https://godoc.org/golang.org/x/mobile
