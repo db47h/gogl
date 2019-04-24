@@ -114,19 +114,14 @@ func (t *Type) CDecl(arg string) string {
 func (t *Type) ToC(arg string) string {
 	gn := t.GoName(false)
 	switch gn {
-	case "string":
-		return "C.CString(" + arg + ")"
 	case "unsafe.Pointer", "*unsafe.Pointer":
 		if t.Name == "void" {
 			return arg
 		}
 		fallthrough
 	default:
-		if t.Ptr > 1 {
-			return "(" + strings.Repeat("*", t.Ptr) + "C." + t.Name + ")(unsafe.Pointer(" + arg + "))"
-		}
 		if t.Ptr > 0 {
-			return "(" + strings.Repeat("*", t.Ptr) + "C." + t.Name + ")(" + arg + ")"
+			return "(" + strings.Repeat("*", t.Ptr) + "C." + t.Name + ")(unsafe.Pointer(" + arg + "))"
 		}
 		return "C." + t.Name + "(" + arg + ")"
 	}
