@@ -68,37 +68,59 @@ and functions.
 
 ```go
 // CoreProfile is true if the API was configured for the OpenGL core profile.
+// The actual constant value depends on the requested API version and profile when
+// generating the package.
+//
 // This is always false if API is GLES2.
 //
 const CoreProfile = true
 
-// APIVersionMajor and APIVersionMinor represent the supported API version.
-// To query the runtime API version, use the Version function.
+// API type: OpenGL or OpenGLES.
 //
-const (
-    APIVersionMajor = 3
-    APIVersionMinor = 3
-)
+type API int
 
 // API Values.
 //
 const (
-    GL = iota
-    GLES2
+    OpenGL API = iota
+    OpenGLES
 )
 
-// API in use: GL or GLES2.
+func (a API) String() string
+
+// Version represents an API version.
 //
-const (
-    API       = GL
-    APIString = "GL"
-)
-```
+type Version struct {
+    API   API
+    Major int
+    Minor int
+}
 
-The actual constant values depend on the requested API version and profile when
-generating the package.
+// GE returns true if version v is greater or equal to Version{major, minor}.
+//
+// The following example shows how to use it in compatibility checks:
+//
+//  ver := gl.RuntimeVersion()
+//  switch ver {
+//  case ver.GE(OpenGL, 4, 0) || ver.GE(OpenGLES, 3, 1):
+//      // call glDrawArraysIndirect
+//  case ver.GE(OpenGL, 3, 1) || ver.GE(OpenGLES, 3, 0):
+//      // call glDrawArraysInstanced
+//  default:
+//      // fallback
+//  }
+//
+func (v Version) GE(api API, major, minor int) bool
 
-```go
+// APIVersion returns the OpenGL or OpenGLES version supported by the package.
+//
+func APIVersion() Version
+
+// RuntimeVersion returns the OpenGL or OpenGLES version available at runtime,
+// which may differ from APIVersion.
+//
+func RuntimeVersion() Version
+
 // InitC initializes OpenGL. loader is a function pointer to a C function of type
 //
 //  typedef void *(*loader) (const char *funcName)
@@ -114,9 +136,6 @@ func InitC(loader unsafe.Pointer) error
 //
 func InitGo(loader func(string) unsafe.Pointer)
 
-// Version returns the runtime OpenGL or OpenGLES version.
-//
-func Version() (major, minor int)
 ```
 
 After setting up an OpenGL context (for example after calling
@@ -170,19 +189,42 @@ at link time (except for extensions). The above example is however portable
 between both APIs and demonstrates how to aggregate multiple OpenGL calls into a
 single cgo call.
 
+C code can use the GLVersion struct in order to query the runtime OpenGL or
+OpenGLES version along with the mutually exclusive `GOTAG_gl` and `GOTAG_gles`
+defines for the API type.
+
 ## TODO
 
+TODOs and issues in no particular order.
+
+- [ ] (may be) Use a `context` wrapper structure and interface to check
+  available functions in a more Go-ish way:
+
+  ```go
+  switch ctx = ctx.(type) {
+    case gl.Context_ES3_3_1:
+        // call glDrawArraysIndirect
+    case gl.Context_ES3_3_0:
+        // call glDrawArraysInstanced
+    default:
+        // fallback to the hard way...
+  }
+  ```
+
+- [ ] Fix issue with type GLhandleARB that is of a different size on macOS vs.
+  the rest of the world... Not an issue until extension support is added.
 - [ ] Compile flags/tags for Windows, macOS, Android and iOS and proper
   automatic detection of the GL or GLES API at compile time.
 - [ ] Extend the demo project to compile with gomobile.
 - [ ] Add support for Raspberry Pi.
-- [ ] Parse and generate C types from the XML
+- [ ] Parse and generate C types from gl.xml.
 - [ ] (may be) create appropriate Go types with a C() function that converts to
   the proper C type (note that strings are tricky to handle automatically in a
   proper and efficient way).
 - [ ] Option for GLES3.
 - [ ] Handle extensions.
 - [ ] Get rid of `khrplatform.h`.
+- [ ] Provide a loader function.
 
 Do not hesitate to contribute! Especially if you can test Windows, macOS or iOS.
 

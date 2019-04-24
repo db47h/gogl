@@ -25,16 +25,17 @@ func main() {
 	}
 	defer glfw.Terminate()
 
-	switch gl.API {
-	case gl.GL:
+	apiVer := gl.APIVersion()
+	switch apiVer.API {
+	case gl.OpenGL:
 		glfw.WindowHint(glfw.ClientAPI, glfw.OpenGLAPI)
-	case gl.GLES2:
+	case gl.OpenGLES:
 		glfw.WindowHint(glfw.ClientAPI, glfw.OpenGLESAPI)
 	default:
 		panic("unsupported API")
 	}
-	glfw.WindowHint(glfw.ContextVersionMajor, gl.APIVersionMajor)
-	glfw.WindowHint(glfw.ContextVersionMinor, gl.APIVersionMinor)
+	glfw.WindowHint(glfw.ContextVersionMajor, apiVer.Major)
+	glfw.WindowHint(glfw.ContextVersionMinor, apiVer.Minor)
 	if gl.CoreProfile {
 		glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	}
@@ -49,8 +50,8 @@ func main() {
 	gl.InitGo(glfw.GetProcAddress)
 
 	log.Print(glfw.GetVersionString())
-	ma, mi := gl.Version()
-	log.Printf("Runtime API: %s %s %d.%d", gl.GetGoString(gl.GL_VENDOR), gl.APIString, ma, mi)
+	ver := gl.RuntimeVersion()
+	log.Printf("Runtime API: %s %s %d.%d", gl.GetGoString(gl.GL_VENDOR), ver.API.String(), ver.Major, ver.Minor)
 
 	window.SetKeyCallback(func(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 		switch key {

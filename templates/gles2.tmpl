@@ -29,27 +29,67 @@ import (
 //
 const CoreProfile = {{ if eq .Profile "core" }}true{{ else }}false{{ end}}
 
-// APIVersionMajor and APIVersionMinor represent the supported API version.
-// To query the runtime API version, use the Version function.
+// API type: OpenGL or OpenGLES.
 //
-const (
-    APIVersionMajor = {{ .Version.Major }}
-    APIVersionMinor = {{ .Version.Minor }}
-)
+type API int
 
 // API Values.
 //
 const (
-    GL = iota
-    GLES2
+    OpenGL API = iota
+    OpenGLES
 )
 
-// API in use: GL or GLES2.
+func (a API) String() string {
+    if a == OpenGL {
+        return "OpenGL"
+    }
+    return "OpenGLES"
+}
+
+// Version represents an API version.
 //
-const (
-    API = {{if eq .API "gl"}}GL{{ else }}GLES2{{ end }}
-    APIString = {{if eq .API "gl"}}"GL"{{ else }}"GLES2"{{ end }}
-)
+type Version struct {
+    API   API
+    Major int
+    Minor int
+}
+
+// GE returns true if version v is greater or equal to Version{api, major, minor}
+// and v.API is equal to the api argument.
+//
+// The following example shows how to use it in compatibility checks:
+//
+//  ver := gl.RuntimeVersion()
+//  switch ver {
+//  case ver.GE(OpenGL, 4, 0) || ver.GE(OpenGLES, 3, 1):
+//      // call glDrawArraysIndirect
+//  case ver.GE(OpenGL, 3, 1) || ver.GE(OpenGLES, 3, 0):
+//      // call glDrawArraysInstanced
+//  default:
+//      // fallback
+//  }
+//
+func (v Version) GE(api API, major, minor int) bool {
+    return v.API == api && (v.Major > major || v.Major == major && v.Minor >= minor)
+}
+
+// APIVersion returns the OpenGL or OpenGLES version supported by the package.
+//
+func APIVersion() Version {
+    return Version{
+        {{- if eq .API "gl"}}OpenGL{{ else }}OpenGLES{{ end }}, {{ .Version.Major }}, {{ .Version.Minor -}}
+    }
+}
+
+// RuntimeVersion returns the OpenGL or OpenGLES version available at runtime,
+// which may differ from APIVersion.
+//
+func RuntimeVersion() Version {
+    return Version{
+        {{- if eq .API "gl"}}OpenGL{{ else }}OpenGLES{{ end -}}
+        , int(C.GLVersion.major), int(C.GLVersion.minor)}
+}
 
 // InitC initializes OpenGL. loader is a function pointer to a C function of type
 //
@@ -84,12 +124,6 @@ func InitGo(loader func(string) unsafe.Pointer) {
     }
     C.GLVersion.major = C.int(major)
     C.GLVersion.minor = C.int(minor)
-}
-
-// Version returns the runtime OpenGL or OpenGLES version.
-//
-func Version() (major, minor int) {
-    return int(C.GLVersion.major), int(C.GLVersion.minor)
 }
 
 // GL Constants
