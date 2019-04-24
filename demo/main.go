@@ -1,4 +1,4 @@
-//go:generate gogl -o internal/gl -v 3.3 -profile core
+//go:generate go run .. -o internal/gl -v 3.3 -profile core
 
 // +build demo
 

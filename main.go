@@ -4,7 +4,7 @@
 
 //go:generate mkdir -p registry
 //go:generate curl -L --compressed -o registry/gl.xml https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/master/xml/gl.xml
-//go:generate curl -L --compressed -o registry/khrplatform.h https://www.khronos.org/registry/EGL/api/KHR/khrplatform.h
+//go:generate curl -L --compressed -o registry/khrplatform.h https://raw.githubusercontent.com/KhronosGroup/EGL-Registry/master/api/KHR/khrplatform.h
 //go:generate go-bindata registry templates
 
 package main

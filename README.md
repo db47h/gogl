@@ -17,15 +17,15 @@ following situations:
 - Most of the custom C code is written once, bundled in the generated package.
 
 There is also the `gl` package from [gomobile]. It uses Go channels and a worker
-goroutine that will batch multiple GL calls into a single cgo call. While it
+goroutine that will batch multiple GL calls into a single [cgo] call. While it
 enables OpenGL calls from any goroutine, there is no explicit control of the
 batching mechanism and trading cgo calls for channel writes severely impacts
 performance: on an AMD FX6300 a cgo call incurs a 80ns overhead vs. over 400ns
 for a channel write (and 80ns vs 200ns on an i5 Skylake).
 
-## Usage
+## Installation
 
-### Installation
+### Go 1.12
 
 ```bash
 git clone https://github.com/db47h/gogl
@@ -33,12 +33,22 @@ cd gogl
 go install
 ```
 
+### Earlier Go versions
+
+```bash
+go get -u github.com/go-gl/glfw/v3.2/glfw # only required by the demo program
+go get github.com/db47h/gogl
+cd `go env GOPATH`/src/github.com/db47h/gogl
+```
+
+## Generating a GL package
+
 gogl was intended to generate internal packages. For example, to compile the
 demo program:
 
 ```bash
 cd demo
-gogl -v 3.3 -profile core -o internal/gl
+go run .. -v 3.3 -profile core -o internal/gl
 go run -tags demo .
 ```
 
@@ -57,10 +67,10 @@ By default on desktop, it will use the OpenGL API. You can however force the
 OpenGLES 2 API by compiling with the `gles2` tag:
 
 ```bash
-go run -tags "demo gles2"
+go run -tags "demo gles2" .
 ```
 
-### Using the generated API
+## Using the generated package
 
 In addition to Go wrappers for OpenGL and OpenGLES functions (same function name
 minus the `gl` prefix), the generated package provides the following constants
@@ -96,7 +106,8 @@ type Version struct {
     Minor int
 }
 
-// GE returns true if version v is greater or equal to Version{major, minor}.
+// GE returns true if version v is greater or equal to Version{api, major, minor}
+// and v.API is equal to the api argument.
 //
 // The following example shows how to use it in compatibility checks:
 //
@@ -153,7 +164,7 @@ compile time) but will end up calling a nil pointer. Client code must therefore
 check API compatibility and act accordingly (either bail out or work around
 unavailable API calls).
 
-### Customizing the generated packages
+### Customizing the generated package
 
 See [demo/internal/gl/custom.go](demo/internal/gl/custom.go) for an example.
 
@@ -162,11 +173,13 @@ generated function, for example:
 
 ```go
 func GetGoString(name uint32) string {
+    // This one is a real conversion pain, so we just simplify its usage
+    // with a nice wrapper.
 	return C.GoString((*C.char)(unsafe.Pointer(GetString(name))))
 }
 ```
 
-or, write a C wrapper (this is because cgo cannot call C function pointers):
+or, write a C wrapper and a Go function that calls the wrapper:
 
 ```go
 /*
@@ -184,13 +197,13 @@ func CustomClear(mask uint32, r, g, b float32) {
 }
 ```
 
-This is not strictly necessary with GLES2 where function pointers are resolved
-at link time (except for extensions). The above example is however portable
-between both APIs and demonstrates how to aggregate multiple OpenGL calls into a
-single cgo call.
+This double-wrapper is required because calling C function pointers from Go is
+currently not supported (see the [cgo] documentation). While this is not
+strictly necessary with GLES2, the above example is portable between both APIs
+and demonstrates how to aggregate multiple OpenGL calls into a single cgo call.
 
 C code can use the GLVersion struct in order to query the runtime OpenGL or
-OpenGLES version along with the mutually exclusive `GOTAG_gl` and `GOTAG_gles`
+OpenGLES version along with the mutually exclusive `GOTAG_gl` and `GOTAG_gles2`
 defines for the API type.
 
 ## TODO
@@ -198,7 +211,7 @@ defines for the API type.
 TODOs and issues in no particular order.
 
 - [ ] (may be) Use a `context` wrapper structure and interface to check
-  available functions in a more Go-ish way:
+  for available functions in a more Go-ish way:
 
   ```go
   switch ctx = ctx.(type) {
@@ -230,12 +243,25 @@ Do not hesitate to contribute! Especially if you can test Windows, macOS or iOS.
 
 ## License
 
-The generated code is subject to the (MIT) license in the generated
-`khrplatform.h` file. Other generated files are not licensed.
+### gogl
 
-The gogl program itself is released under the MIT license (with an exception for
-the generated code as mentioned above). See the [LICENSE](LICENSE) file.
+The gogl program itself is released under the terms of the MIT license. See the
+[LICENSE] file.
 
+### Generated code
+
+The file [khrplatform.h] in the generated code is copyrighted by The Khronos
+Group Inc. and is released under the terms of the MIT license.
+
+The other generated files are provided as-is, without warranty of any kind (the
+limitation of warranty and liability clauses of the gogl license applies to
+these) and the gogl authors do not claim any copyright over them. However, these
+files being the result of processing the file [gl.xml] (i.e. derivative works),
+they may fall under the terms of Apache License Version 2.0 attached to it.
 
 [glow]: https://github.com/go-gl/glow
 [gomobile]: https://godoc.org/golang.org/x/mobile
+[cgo]: https://golang.org/cmd/cgo/
+[khrplatform.h]: https://www.khronos.org/registry/EGL/api/KHR/khrplatform.h
+[gl.xml]: https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/master/xml/gl.xml
+[LICENSE]: LICENSE
