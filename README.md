@@ -48,7 +48,7 @@ demo program:
 
 ```bash
 cd demo
-go run .. -v 3.3 -profile core -o internal/gl
+go run .. -gl 3.3 -profile core -o internal/gl -v
 go run -tags demo .
 ```
 
@@ -62,6 +62,10 @@ go run -tags demo .
 
 Note that the `demo` build tag is only here to prevent `go get` and the likes to
 try and compile the demo program.
+
+On the first run, gogl will fetch the the [gl.xml] registry file from github and
+will cache it for subsequent runs. You can force an update of this file with the
+`-f` switch.
 
 By default on desktop, it will use the OpenGL API. You can however force the
 OpenGLES 2 API by compiling with the `gles2` tag:
@@ -157,7 +161,7 @@ for `InitGo`.
 
 When using the OpenGL API, the `InitC` and `InitGo` functions will lookup
 functions only for the API available at runtime. For example, if the package was
-generated for OpenGL 4.5 core profile but only version 4.5 is available at
+generated for OpenGL 4.6 core profile but only version 4.5 is available at
 runtime, the C function `glSpecializeShader` will not be looked up. The Go
 function `SpecializeShader` will still be available (since it was generated at
 compile time) but will end up calling a nil pointer. Client code must therefore
@@ -173,8 +177,7 @@ generated function, for example:
 
 ```go
 func GetGoString(name uint32) string {
-    // This one is a real conversion pain, so we just simplify its usage
-    // with a nice wrapper.
+    // This one is a real conversion pain, so we simplify its usage with a nice wrapper.
 	return C.GoString((*C.char)(unsafe.Pointer(GetString(name))))
 }
 ```
@@ -230,13 +233,11 @@ TODOs and issues in no particular order.
   automatic detection of the GL or GLES API at compile time.
 - [ ] Extend the demo project to compile with gomobile.
 - [ ] Add support for Raspberry Pi.
-- [ ] Parse and generate C types from gl.xml.
 - [ ] (may be) create appropriate Go types with a C() function that converts to
   the proper C type (note that strings are tricky to handle automatically in a
   proper and efficient way).
 - [ ] Option for GLES3.
 - [ ] Handle extensions.
-- [ ] Get rid of `khrplatform.h`.
 - [ ] Provide a loader function.
 
 Do not hesitate to contribute! Especially if you can test Windows, macOS or iOS.
@@ -250,18 +251,15 @@ The gogl program itself is released under the terms of the MIT license. See the
 
 ### Generated code
 
-The file [khrplatform.h] in the generated code is copyrighted by The Khronos
-Group Inc. and is released under the terms of the MIT license.
-
-The other generated files are provided as-is, without warranty of any kind (the
+The generated files are provided as-is, without warranty of any kind (the
 limitation of warranty and liability clauses of the gogl license applies to
-these) and the gogl authors do not claim any copyright over them. However, these
-files being the result of processing the file [gl.xml] (i.e. derivative works),
-they may fall under the terms of Apache License Version 2.0 attached to it.
+these files) and the gogl authors do not claim any copyright over them.
+Additionally, these files being the result of processing the file [gl.xml] (i.e.
+derivative works), they may fall under the terms of the Apache License Version
+2.0 attached to it.
 
 [glow]: https://github.com/go-gl/glow
 [gomobile]: https://godoc.org/golang.org/x/mobile
 [cgo]: https://golang.org/cmd/cgo/
-[khrplatform.h]: https://www.khronos.org/registry/EGL/api/KHR/khrplatform.h
 [gl.xml]: https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/master/xml/gl.xml
 [LICENSE]: LICENSE

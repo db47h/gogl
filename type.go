@@ -41,7 +41,7 @@ var types = map[string][]string{
 	"GLclampx":             {"int32", "*int32", "**int32"},
 	"GLdouble":             {"float64", "*float64", "**float64"},
 	"GLclampd":             {"float64", "*float64", "**float64"},
-	"GLhandleARB":          {"uintptr", "uintptr", "uintptr"},
+	"GLhandleARB":          {"uintptr", "unsafe.Pointer", "*unsafe.Pointer"},
 	"GLsync":               {"unsafe.Pointer", "unsafe.Pointer", "unsafe.Pointer"},
 	"GLeglClientBufferEXT": {"unsafe.Pointer", "unsafe.Pointer", "unsafe.Pointer"},
 	"GLeglImageOES":        {"unsafe.Pointer", "unsafe.Pointer", "unsafe.Pointer"},
@@ -55,9 +55,10 @@ var types = map[string][]string{
 }
 
 type Type struct {
-	Name  string
-	Ptr   int
-	Const bool
+	Name    string
+	Ptr     int
+	Const   bool
+	Typedef string
 }
 
 func MkType(name string, raw string) Type {

@@ -2,10 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-//go:generate mkdir -p registry
-//go:generate curl -L --compressed -o registry/gl.xml https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/master/xml/gl.xml
-//go:generate curl -L --compressed -o registry/khrplatform.h https://raw.githubusercontent.com/KhronosGroup/EGL-Registry/master/api/KHR/khrplatform.h
-//go:generate go-bindata registry templates
+//go:generate go-bindata templates
 
 package main
 
@@ -14,59 +11,67 @@ import (
 	"encoding/xml"
 	"flag"
 	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 )
 
 var (
-	api     = "gl"
-	version Version
-	profile string
-	tags    string
-	pkgname string
+	api            = "gl"
+	version        Version
+	versionGLES    Version
+	profile        string
+	tags           string
+	pkgname        string
+	forceRegUpdate bool
+	verbose        bool
 )
 
 func main() {
-	var (
-		out string
-		in  = "registry/gl.xml"
-	)
+	var out string
 
-	flag.Var(&version, "v", "OpenGL api `version` (default: 3.1)")
+	flag.Var(&version, "gl", "OpenGL api `version` (default: 3.1)")
+	// flag.Var(&version, "gles", "OpenGLES api `version` (default: 2.0)")
 	flag.StringVar(&profile, "profile", "", "default profile")
 	flag.StringVar(&pkgname, "p", "gl", "package `name`")
 	flag.StringVar(&out, "o", "", "output `directory`")
+	flag.BoolVar(&forceRegUpdate, "f", false, "force update of gl.xml")
+	flag.BoolVar(&verbose, "v", false, "verbose output")
 
 	flag.Parse()
 
 	if version.Major == 0 && version.Minor == 0 {
 		version.Set("3.1")
 	}
+	if versionGLES.Major == 0 && versionGLES.Minor == 0 {
+		versionGLES.Set("2.0")
+	}
 
-	regXML, err := Asset(in)
+	regXML, err := getRegistry(forceRegUpdate)
 	if err != nil {
 		panic(err)
+	}
+	if verbose {
+		log.Print("Parsing gl.xml (GL)")
 	}
 	r, err := decodeRegistry(bytes.NewReader(regXML))
 	if err != nil {
 		panic(err)
 	}
 
-	asset, err := Asset("registry/khrplatform.h")
-	if err != nil {
-		panic(err)
-	}
-	if err = ioutil.WriteFile(filepath.Join(out, "khrplatform.h"), asset, 0666); err != nil {
-		panic(err)
-	}
-
 	fmap := template.FuncMap{"ToUpper": strings.ToUpper, "NewVersion": NewVersion}
 
 	fname := "header.tmpl"
-	asset, err = Asset("templates/" + fname)
+	of := filepath.Join(out, "gl.h")
+	if verbose {
+		log.Printf("Generating %s", of)
+	}
+	asset, err := Asset("templates/" + fname)
 	if err != nil {
 		panic(err)
 	}
@@ -74,7 +79,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	o, err := os.Create(filepath.Join(out, "gl.h"))
+	o, err := os.Create(of)
 	if err != nil {
 		panic(err)
 	}
@@ -85,6 +90,10 @@ func main() {
 	}
 
 	fname = "gl.tmpl"
+	of = filepath.Join(out, "gl.go")
+	if verbose {
+		log.Printf("Generating %s", of)
+	}
 	asset, err = Asset("templates/" + fname)
 	if err != nil {
 		panic(err)
@@ -93,7 +102,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	o, err = os.Create(filepath.Join(out, "gl.go"))
+	o, err = os.Create(of)
 	if err != nil {
 		panic(err)
 	}
@@ -105,15 +114,22 @@ func main() {
 	}
 
 	api = "gles2"
-	version.Set("2.0")
+	version = versionGLES
 	profile = ""
 	tags = "gles2,!darwin"
+	if verbose {
+		log.Print("Parsing gl.xml (GLES)")
+	}
 	r, err = decodeRegistry(bytes.NewReader(regXML))
 	if err != nil {
 		panic(err)
 	}
 
 	fname = "gles2.tmpl"
+	of = filepath.Join(out, "gles2.go")
+	if verbose {
+		log.Printf("Generating %s", of)
+	}
 	asset, err = Asset("templates/" + fname)
 	if err != nil {
 		panic(err)
@@ -122,7 +138,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	o, err = os.Create(filepath.Join(out, "gles2.go"))
+	o, err = os.Create(of)
 	if err != nil {
 		panic(err)
 	}
@@ -131,6 +147,56 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+const regUrl = "https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry/master/xml/gl.xml"
+
+func getRegistry(forceFetch bool) ([]byte, error) {
+	c, err := os.UserCacheDir()
+	if err != nil {
+		return fetchRegistry()
+	}
+	// create gogl dir
+	c = filepath.Join(c, "gogl")
+	err = os.MkdirAll(c, 0777)
+	if err != nil && !os.IsExist(err) {
+		return fetchRegistry()
+	}
+	c = filepath.Join(c, "gl.xml")
+	fi, err := os.Stat(c)
+	if err != nil && !os.IsNotExist(err) {
+		return fetchRegistry()
+	}
+	if !forceFetch && err == nil {
+		if verbose {
+			log.Printf("Using cached registry file %s; last updated: %v", c, fi.ModTime().Format(time.RFC1123))
+			log.Printf("Use the -f switch to force an update")
+		}
+		return ioutil.ReadFile(c)
+	}
+	// write cache
+	data, err := fetchRegistry()
+	if err != nil {
+		panic(err)
+	}
+	ioutil.WriteFile(c, data, 0666)
+	return data, nil
+}
+
+func fetchRegistry() ([]byte, error) {
+	if verbose {
+		log.Printf("Fetching OpenGL registry from %s", regUrl)
+	}
+	resp, err := http.Get(regUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 type Command struct {

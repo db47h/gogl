@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ type Registry struct {
 	Tags     string
 	Package  string
 	Profile  string
+	Typedefs []string
 	Enums    []Enum
 	Commands []*Command
 }
@@ -34,6 +36,7 @@ func decodeRegistry(r io.Reader) (*Registry, error) {
 		Tags:     tags,
 		Package:  pkgname,
 		Profile:  profile,
+		Typedefs: reg.Typedefs,
 		Enums:    sortEnums(reg.Enums),
 		Commands: sortCommands(reg.Commands),
 	}, nil
@@ -44,6 +47,7 @@ type registry struct {
 		Enums    map[string]string
 		Commands map[string]*Command
 	}
+	Typedefs []string
 	Enums    map[string]string
 	Commands map[string]*Command
 }
@@ -65,6 +69,10 @@ func (r *registry) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		switch t := t.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
+			case "types":
+				if err = r.decodeTypes(d, &t); err != nil {
+					return err
+				}
 			case "enums":
 				if err = r.decodeEnums(d, &t); err != nil {
 					return err
@@ -85,6 +93,76 @@ func (r *registry) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 			return fmt.Errorf("unexpected token type %T", t)
 		}
 	}
+}
+
+func (r *registry) decodeTypes(d *xml.Decoder, start *xml.StartElement) error {
+	var td []byte
+	inType := false
+L:
+	for {
+		tok, err := d.Token()
+		if err != nil {
+			return err
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			switch t.Name.Local {
+			case "type":
+				inType = true
+				for _, a := range t.Attr {
+					if a.Name.Local == "name" && a.Value == "khrplatform" {
+						inType = false
+					}
+				}
+			case "apientry":
+				td = append(td, "APIENTRY"...)
+			}
+		case xml.CharData:
+			if inType {
+				td = append(td, t...)
+			}
+		case xml.EndElement:
+			switch t.Name.Local {
+			case "type":
+				if inType {
+					r.Typedefs = append(r.Typedefs, convertTypedef(td))
+					td = td[:0]
+					inType = false
+				}
+			case "types":
+				break L
+			}
+		}
+	}
+	return nil
+}
+
+// Remove dependency on khrplatform.h
+//
+func convertTypedef(td []byte) string {
+	k := bytes.Index(td, []byte("khronos_"))
+	if k < 0 {
+		return string(td)
+	}
+	n := bytes.IndexByte(td[k:], '_') + 1 + k
+	e := bytes.IndexByte(td[n:], ' ') + n
+	subst := ""
+	switch s := string(td[n:e]); s {
+	case "int8_t", "uint8_t", "int16_t", "uint16_t", "int32_t", "uint32_t", "int64_t", "uint64_t", "intptr_t", "uintptr_t":
+		subst = s
+	case "float_t":
+		subst = "float"
+	case "ssize_t":
+		subst = "intptr_t"
+	case "usize_t":
+		subst = "uintptr_t"
+	default:
+		panic("invalid type khronos_" + s)
+	}
+	copy(td[k:], subst)
+	copy(td[k+len(subst):], td[e:])
+	td = td[:len(td)-(e-k)+len(subst)]
+	return string(td)
 }
 
 func (r *registry) decodeFeature(d *xml.Decoder, start *xml.StartElement) error {
