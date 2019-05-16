@@ -49,6 +49,7 @@ func (v *Version) Set(s string) error {
 	return nil
 }
 
+// Less returns true if v < rhs
 func (v *Version) Less(rhs *Version) bool {
 	if v.Major == rhs.Major {
 		return v.Minor < rhs.Minor

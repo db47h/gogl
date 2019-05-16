@@ -12,14 +12,14 @@ import (
 )
 
 type Registry struct {
-	API      string
-	Version  Version
-	Tags     string
-	Package  string
-	Profile  string
-	Typedefs []string
-	Enums    []Enum
-	Commands []*Command
+	API         string
+	Version     Version
+	Tags        string
+	Package     string
+	CoreProfile bool
+	Typedefs    []string
+	Enums       []Enum
+	Commands    []*Command
 }
 
 func decodeRegistry(r io.Reader) (*Registry, error) {
@@ -31,14 +31,14 @@ func decodeRegistry(r io.Reader) (*Registry, error) {
 	}
 
 	return &Registry{
-		API:      api,
-		Version:  version,
-		Tags:     tags,
-		Package:  pkgname,
-		Profile:  profile,
-		Typedefs: reg.Typedefs,
-		Enums:    sortEnums(reg.Enums),
-		Commands: sortCommands(reg.Commands),
+		API:         api,
+		Version:     version,
+		Tags:        tags,
+		Package:     pkgname,
+		CoreProfile: coreProfile,
+		Typedefs:    reg.Typedefs,
+		Enums:       sortEnums(reg.Enums),
+		Commands:    sortCommands(reg.Commands),
 	}, nil
 }
 
@@ -217,7 +217,7 @@ func (r *registry) decodeFeature(d *xml.Decoder, start *xml.StartElement) error 
 		r.Commands[c.Name] = v
 	}
 	for i := range ft.Remove {
-		if ft.Remove[i].Profile != profile {
+		if coreProfile && ft.Remove[i].Profile != "core" {
 			continue
 		}
 		for _, e := range ft.Remove[i].Enums {

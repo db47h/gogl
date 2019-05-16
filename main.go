@@ -25,7 +25,7 @@ var (
 	api            = "gl"
 	version        Version
 	versionGLES    Version
-	profile        string
+	coreProfile    bool
 	tags           string
 	pkgname        string
 	forceRegUpdate bool
@@ -37,7 +37,7 @@ func main() {
 
 	flag.Var(&version, "gl", "OpenGL api `version` (default: 3.1)")
 	// flag.Var(&version, "gles", "OpenGLES api `version` (default: 2.0)")
-	flag.StringVar(&profile, "profile", "", "default profile")
+	flag.BoolVar(&coreProfile, "core", false, "use OpenGL core profile")
 	flag.StringVar(&pkgname, "p", "gl", "package `name`")
 	flag.StringVar(&out, "o", "", "output `directory`")
 	flag.BoolVar(&forceRegUpdate, "f", false, "force update of gl.xml")
@@ -46,7 +46,13 @@ func main() {
 	flag.Parse()
 
 	if version.Major == 0 && version.Minor == 0 {
-		version.Set("3.1")
+		version.Set("3.2")
+	}
+	if coreProfile && version.Less(&Version{Major: 3, Minor: 2}) {
+		coreProfile = false
+		if verbose {
+			log.Print("Warning: core profile only supported in OpenGL versions >= 3.2")
+		}
 	}
 	if versionGLES.Major == 0 && versionGLES.Minor == 0 {
 		versionGLES.Set("2.0")
@@ -115,7 +121,7 @@ func main() {
 
 	api = "gles2"
 	version = versionGLES
-	profile = ""
+	coreProfile = false
 	tags = "gles2,!darwin"
 	if verbose {
 		log.Print("Parsing gl.xml (GLES)")

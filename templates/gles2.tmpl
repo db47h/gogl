@@ -28,7 +28,7 @@ import (
 // CoreProfile is true if the API was configured for the OpenGL core profile.
 // This is always false if API is GLES2.
 //
-const CoreProfile = {{ if eq .Profile "core" }}true{{ else }}false{{ end}}
+const CoreProfile = {{ .CoreProfile }}
 
 // API type: OpenGL or OpenGLES.
 //
