@@ -48,7 +48,7 @@ demo program:
 
 ```bash
 cd demo
-go run .. -gl 3.3 -profile core -o internal/gl -v
+go run .. -gl 3.3 -core -o internal/gl -v
 go run -tags demo .
 ```
 
